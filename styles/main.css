@@ -315,6 +315,11 @@ h4,
   width: 78px;
 }
 
+.admin-edit-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
 .stagger-item {
   opacity: 0;
   transform: translateY(14px);

@@ -428,21 +428,53 @@ function onAdminListChange(event) {
     return;
   }
 
-  const ratingInput = event.target.closest("input[data-action='rating']");
-  if (!ratingInput) {
+  const editableInput = event.target.closest("[data-action='field']");
+  if (!editableInput) {
     return;
   }
 
-  const id = ratingInput.dataset.id;
-  const nextRating = Number(ratingInput.value);
-  if (!id || Number.isNaN(nextRating) || nextRating < 1 || nextRating > 10) {
+  const id = editableInput.dataset.id;
+  const field = editableInput.dataset.field;
+  if (!id || !field) {
     return;
   }
 
-  void updateShake(id, { rating: nextRating }).catch((err) => {
-    console.error("Error updating shake:", err);
-    setMutationErrorMessage("updating", err);
-  });
+  const previousValue = String(editableInput.dataset.original || "");
+  let nextValue;
+
+  if (field === "rating") {
+    const parsed = Number(editableInput.value);
+    if (Number.isNaN(parsed) || parsed < 1 || parsed > 10) {
+      editableInput.value = previousValue;
+      return;
+    }
+    nextValue = Number(parsed.toFixed(1));
+  } else {
+    nextValue = String(editableInput.value || "").trim();
+    if (field === "name" && !nextValue) {
+      editableInput.value = previousValue;
+      return;
+    }
+  }
+
+  if (String(nextValue) === previousValue) {
+    return;
+  }
+
+  const updates = { [field]: nextValue };
+
+  void updateShake(id, updates)
+    .then(() => {
+      editableInput.dataset.original = String(nextValue);
+      if (ui.admin.formMessage) {
+        setStatusMessage(ui.admin.formMessage, "Milkshake updated.");
+      }
+    })
+    .catch((err) => {
+      console.error("Error updating shake:", err);
+      editableInput.value = previousValue;
+      setMutationErrorMessage("updating", err);
+    });
 }
 
 function renderAdminList() {
@@ -462,18 +494,58 @@ function renderAdminList() {
     rowNode.style.setProperty("--delay", `${index * 35}ms`);
     rowNode.innerHTML = state.adminAuthorized
       ? `
-      <div>
-        <strong>${escapeHtml(shake.name)}</strong>
-        <p class="meta">${escapeHtml(shake.shop)} · ${escapeHtml(shake.flavor)}</p>
+      <div class="admin-edit-grid">
+        <div>
+          <label class="small text-body-secondary" for="name-${shake.id}">Name</label>
+          <input
+            id="name-${shake.id}"
+            class="form-control form-control-sm"
+            data-action="field"
+            data-field="name"
+            data-id="${shake.id}"
+            data-original="${escapeHtml(shake.name)}"
+            type="text"
+            maxlength="80"
+            value="${escapeHtml(shake.name)}"
+          />
+          <p class="meta mt-1 mb-0">${escapeHtml(shake.shop)} · ${escapeHtml(shake.flavor)}</p>
+        </div>
+        <div>
+          <label class="small text-body-secondary" for="notes-${shake.id}">Description</label>
+          <textarea
+            id="notes-${shake.id}"
+            class="form-control form-control-sm"
+            data-action="field"
+            data-field="notes"
+            data-id="${shake.id}"
+            data-original="${escapeHtml(shake.notes || "")}" 
+            rows="2"
+            maxlength="240"
+          >${escapeHtml(shake.notes || "")}</textarea>
+        </div>
+        <div>
+          <label class="small text-body-secondary" for="photo-${shake.id}">Photo URL</label>
+          <input
+            id="photo-${shake.id}"
+            class="form-control form-control-sm"
+            data-action="field"
+            data-field="photo"
+            data-id="${shake.id}"
+            data-original="${escapeHtml(shake.photo || "")}"
+            type="url"
+            value="${escapeHtml(shake.photo || "")}"
+          />
+        </div>
       </div>
-      <p class="meta mb-0">${escapeHtml(shake.notes || "No notes")}</p>
       <div class="d-flex align-items-center gap-2 justify-content-start justify-content-lg-end">
         <label class="small text-body-secondary" for="rate-${shake.id}">Score</label>
         <input
           id="rate-${shake.id}"
           class="form-control form-control-sm admin-score"
-          data-action="rating"
+          data-action="field"
+          data-field="rating"
           data-id="${shake.id}"
+          data-original="${Number(shake.rating).toFixed(1)}"
           type="number"
           min="1"
           max="10"

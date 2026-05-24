@@ -153,7 +153,7 @@ export async function updateShake(id, updates) {
     await initializeFirestore();
   }
 
-  const normalized = normalizeShake(updates);
+  const normalized = normalizeShakeUpdates(updates);
   if (!normalized) {
     throw new Error("Invalid updates");
   }
@@ -164,6 +164,52 @@ export async function updateShake(id, updates) {
     console.error("Error updating shake:", err);
     throw err;
   }
+}
+
+function normalizeShakeUpdates(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const normalized = {};
+
+  if (Object.prototype.hasOwnProperty.call(value, "name")) {
+    const name = String(value.name || "").trim();
+    if (!name) {
+      throw new Error("Name cannot be empty");
+    }
+    normalized.name = name;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, "shop")) {
+    const shop = String(value.shop || "").trim();
+    if (!shop) {
+      throw new Error("Shop cannot be empty");
+    }
+    normalized.shop = shop;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, "flavor")) {
+    normalized.flavor = FLAVORS.includes(value.flavor) ? value.flavor : DEFAULT_FLAVOR;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, "rating")) {
+    const rating = Number(value.rating);
+    if (!Number.isFinite(rating) || rating < 1 || rating > 10) {
+      throw new Error("Rating must be between 1 and 10");
+    }
+    normalized.rating = Number(rating.toFixed(1));
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, "photo")) {
+    normalized.photo = String(value.photo || "").trim();
+  }
+
+  if (Object.prototype.hasOwnProperty.call(value, "notes")) {
+    normalized.notes = String(value.notes || "").trim();
+  }
+
+  return Object.keys(normalized).length ? normalized : null;
 }
 
 export async function deleteShake(id) {
