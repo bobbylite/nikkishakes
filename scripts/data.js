@@ -41,7 +41,12 @@ function setupRealtimeListener() {
 
   const q = query(collection(db, "shakes"));
   unsubscribe = onSnapshot(q, (snapshot) => {
-    cachedShakes = snapshot.docs.map(doc => normalizeShake({ id: doc.id, ...doc.data() })).filter(Boolean);
+    cachedShakes = snapshot.docs
+      .map((snapshotDoc) => {
+        const normalized = normalizeShake(snapshotDoc.data());
+        return normalized ? { ...normalized, id: snapshotDoc.id } : null;
+      })
+      .filter(Boolean);
     notifyDataChange();
   });
 }

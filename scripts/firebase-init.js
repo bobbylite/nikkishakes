@@ -11,6 +11,7 @@ const auth = getAuth(app);
 const authReady = new Promise((resolve) => {
 	const unsubscribe = onAuthStateChanged(auth, async (user) => {
 		if (user) {
+			window.firebaseAuthReadyError = null;
 			unsubscribe();
 			resolve();
 			return;
@@ -18,7 +19,9 @@ const authReady = new Promise((resolve) => {
 
 		try {
 			await signInAnonymously(auth);
+			window.firebaseAuthReadyError = null;
 		} catch (err) {
+			window.firebaseAuthReadyError = err;
 			console.error(
 				"Firebase anonymous auth failed. Enable Anonymous provider in Firebase Console > Authentication > Sign-in method.",
 				err

@@ -391,7 +391,7 @@ function onAdminFormSubmit(event) {
     setStatusMessage(ui.admin.formMessage, "Milkshake saved.");
   }).catch((err) => {
     console.error("Error adding shake:", err);
-    setStatusMessage(ui.admin.formMessage, "Error saving milkshake.", true);
+    setMutationErrorMessage("saving", err);
   });
 }
 
@@ -410,9 +410,17 @@ function onAdminListClick(event) {
     return;
   }
 
-  void deleteShake(id).catch((err) => {
-    console.error("Error deleting shake:", err);
-  });
+  void deleteShake(id)
+    .then(() => {
+      renderAdminList();
+      if (ui.admin.formMessage) {
+        setStatusMessage(ui.admin.formMessage, "Milkshake deleted.");
+      }
+    })
+    .catch((err) => {
+      console.error("Error deleting shake:", err);
+      setMutationErrorMessage("deleting", err);
+    });
 }
 
 function onAdminListChange(event) {
@@ -433,6 +441,7 @@ function onAdminListChange(event) {
 
   void updateShake(id, { rating: nextRating }).catch((err) => {
     console.error("Error updating shake:", err);
+    setMutationErrorMessage("updating", err);
   });
 }
 
@@ -472,7 +481,7 @@ function renderAdminList() {
           value="${Number(shake.rating).toFixed(1)}"
         />
       </div>
-      <button class="btn btn-outline-danger btn-sm" data-action="delete" data-id="${shake.id}">Delete</button>
+      <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" data-id="${shake.id}">Delete</button>
     `
       : `
       <div>
@@ -490,4 +499,37 @@ function setAdminControlsEnabled(isEnabled) {
   ui.admin.form?.querySelectorAll("input, select, textarea, button[type='submit']").forEach((node) => {
     node.disabled = !isEnabled;
   });
+}
+
+function setMutationErrorMessage(action, err) {
+  if (!ui.admin.formMessage) {
+    return;
+  }
+
+  const permissionDenied =
+    err?.code === "permission-denied" ||
+    err?.name === "FirebaseError" ||
+    String(err?.message || "").toLowerCase().includes("permission");
+
+  const firebaseAuthFailed = Boolean(window.firebaseAuthReadyError) || !window.firebaseAuth?.currentUser;
+
+  if (permissionDenied && firebaseAuthFailed) {
+    setStatusMessage(
+      ui.admin.formMessage,
+      `Firestore is blocking ${action} because Firebase Anonymous Auth is not active. Enable Anonymous provider and publish the Firestore rules.`,
+      true
+    );
+    return;
+  }
+
+  if (permissionDenied) {
+    setStatusMessage(
+      ui.admin.formMessage,
+      `Firestore is blocking ${action}. Check your Firestore rules and authenticated user status.`,
+      true
+    );
+    return;
+  }
+
+  setStatusMessage(ui.admin.formMessage, `Error ${action} milkshake.`, true);
 }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>NikkiShakes | SPA Rankings</title>
+    <title>NikkiShakes | Rankings</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="shortcut icon" href="favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -27,9 +27,9 @@
     <div class="noise-overlay"></div>
 
     <header class="app-header container-xl py-3">
-      <nav class="navbar navbar-expand-lg glass-shell rounded-pill px-3 px-md-4">
+      <nav class="navbar navbar-expand-lg glass-shell navbar-surface px-3 px-md-4">
         <a class="navbar-brand d-flex align-items-center gap-2" href="#/rankings" aria-label="NikkiShakes home">
-          <span class="brand-pill">NS</span>
+          <img class="brand-mark" src="assets/logos/logo.png" alt="NikkiShakes logo" />
           <span>
             <strong class="d-block brand-title">NikkiShakes</strong>
             <small class="brand-subtitle">Airy rankings. Serious flavor.</small>
@@ -101,13 +101,18 @@
         <div class="row justify-content-center">
           <div class="col-lg-6 col-xl-5">
             <article class="glass-shell p-4 p-md-5 auth-card">
-              <p class="eyebrow mb-2">Private Portal</p>
-              <h2 class="h1 mb-2">Admin Login</h2>
+              <div class="d-flex align-items-center gap-3 mb-3">
+                <img class="brand-mark" src="assets/logos/logo.png" alt="NikkiShakes logo" />
+                <div>
+                  <p class="eyebrow mb-1">Private Portal</p>
+                  <h2 class="h1 mb-0">NikkiShakes</h2>
+                </div>
+              </div>
               <p class="text-body-secondary mb-4">
                 Sign in with PingOne to unlock admin controls. This static SPA uses OAuth 2.0 Authorization Code with PKCE.
               </p>
               <div class="d-grid gap-2">
-                <button id="loginBtn" class="btn btn-primary btn-lg" type="button">Continue with PingOne</button>
+                <button id="loginBtn" class="btn btn-primary btn-lg" type="button">Sign in</button>
                 <a class="btn btn-outline-secondary" href="#/rankings">Back to rankings</a>
               </div>
               <p id="authMessage" class="notice mt-3 mb-0" role="status" aria-live="polite"></p>
