@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
 import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-analytics.js";
-import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 import { firebaseConfig } from "./firebaseConfig.js";
 
 // Initialize Firebase
@@ -9,26 +9,10 @@ const analytics = getAnalytics(app);
 const auth = getAuth(app);
 
 const authReady = new Promise((resolve) => {
-	const unsubscribe = onAuthStateChanged(auth, async (user) => {
-		if (user) {
-			window.firebaseAuthReadyError = null;
-			unsubscribe();
-			resolve();
-			return;
-		}
-
-		try {
-			await signInAnonymously(auth);
-			window.firebaseAuthReadyError = null;
-		} catch (err) {
-			window.firebaseAuthReadyError = err;
-			console.error(
-				"Firebase anonymous auth failed. Enable Anonymous provider in Firebase Console > Authentication > Sign-in method.",
-				err
-			);
-			unsubscribe();
-			resolve();
-		}
+	const unsubscribe = onAuthStateChanged(auth, () => {
+		window.firebaseAuthReadyError = null;
+		unsubscribe();
+		resolve();
 	});
 });
 

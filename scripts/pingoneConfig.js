@@ -1,26 +1,25 @@
 const originPath = `${window.location.origin}${window.location.pathname}`;
 
 export const pingOneConfig = {
-  // Set true after filling in your client + tenant details below.
+  // Set true after configuring Firebase Authentication OpenID Connect provider.
   enabled: true,
 
-  // Preferred: provide issuerBaseUrl, then authorize/token are auto-derived.
-  // Example (PingOne AIC): https://<tenant>/am/oauth2/realms/root/realms/<realm>
-  issuerBaseUrl: "",
+  // Login UX mode:
+  // - "auto": popup first, then redirect fallback
+  // - "popup": popup only
+  // - "redirect": redirect only
+  loginMode: "auto",
 
-  // Optional endpoint overrides.
-  authorizeEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/authorize",
-  tokenEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/token",
-  introspectionEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/introspect",
-  endSessionEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/signoff",
+  // Must match provider id configured in Firebase Auth (Authentication > Sign-in method > OpenID Connect).
+  firebaseProviderId: "oidc.pingone",
 
-  clientId: "f7383847-2e3f-4dc5-a98b-19841f5ff1a3",
+  // Include custom API scope so PingOne access token carries groups for this app.
+  scopes: "openid profile email shakes",
 
-  // For GitHub Pages SPA callback, keep this as your deployed index URL.
-  redirectUri: originPath,
+  // Client-side UX gate; Firestore rules should also enforce this role.
+  requiredAdminGroup: "shakesAdmin",
 
-  // Optional logout return route.
-  postLogoutRedirectUri: `${originPath}#/login?loggedOut=1`,
-
-  scopes: "openid profile email shakes"
+  // Retained for local reference in docs only.
+  issuerBaseUrl: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as",
+  redirectUri: originPath
 };

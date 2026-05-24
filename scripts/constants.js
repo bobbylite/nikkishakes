@@ -4,6 +4,7 @@ export const STORAGE_KEYS = Object.freeze({
   theme: `${STORAGE_NAMESPACE}:theme`,
   authSession: `${STORAGE_NAMESPACE}:auth-session`,
   oauthContext: `${STORAGE_NAMESPACE}:oauth-context`,
+  authRedirectPending: `${STORAGE_NAMESPACE}:auth-redirect-pending`,
   milkshakes: `${STORAGE_NAMESPACE}:milkshakes`
 });
 

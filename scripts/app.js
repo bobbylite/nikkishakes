@@ -1,4 +1,4 @@
-import { DEFAULT_FLAVOR, FLAVORS, ROUTES } from "./constants.js";
+import { DEFAULT_FLAVOR, FLAVORS, ROUTES, STORAGE_KEYS } from "./constants.js";
 import {
   beginLogin,
   ensureAuthorizationState,
@@ -10,6 +10,7 @@ import {
 import { byId, clearChildren, escapeHtml, setStatusMessage } from "./domUtils.js";
 import { parseQueryFromHash, parseRouteFromHash, navigateTo } from "./routing.js";
 import { initializeTheme, toggleTheme } from "./themeMode.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
 import {
   addShake,
   deleteShake,
@@ -73,8 +74,19 @@ async function initialize() {
   await processAuthCallback();
   await initializeFirestore();
   bindEventHandlers();
+  bindAuthSync();
   setupRealtimeSync();
   await renderFromRoute();
+}
+
+function bindAuthSync() {
+  if (!window.firebaseAuth) {
+    return;
+  }
+
+  onAuthStateChanged(window.firebaseAuth, () => {
+    void renderFromRoute();
+  });
 }
 
 function setupRealtimeSync() {
@@ -146,6 +158,24 @@ async function renderFromRoute() {
   const query = parseQueryFromHash(window.location.hash);
 
   if (route === ROUTES.admin && !state.authenticated) {
+    if (window.firebaseAuthReady) {
+      await window.firebaseAuthReady;
+      state.authenticated = isAuthenticated();
+    }
+
+    if (state.authenticated) {
+      const authorization = await ensureAuthorizationState();
+      state.adminAuthorized = authorization.ok ? authorization.authorized : false;
+      if (!authorization.ok && !isAuthenticated()) {
+        navigateTo(ROUTES.login, { error: authorization.error || "auth-expired" });
+        return;
+      }
+      updateNavState(route);
+      showView(route);
+      renderAdmin();
+      return;
+    }
+
     navigateTo(ROUTES.login);
     return;
   }
@@ -585,10 +615,29 @@ function setMutationErrorMessage(action, err) {
 
   const firebaseAuthFailed = Boolean(window.firebaseAuthReadyError) || !window.firebaseAuth?.currentUser;
 
+  let sessionGroups = [];
+  try {
+    const session = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.authSession) || "null");
+    sessionGroups = Array.isArray(session?.groups) ? session.groups : [];
+  } catch {
+    sessionGroups = [];
+  }
+
+  const hasAdminGroupInSession = sessionGroups.includes("shakesAdmin");
+
   if (permissionDenied && firebaseAuthFailed) {
     setStatusMessage(
       ui.admin.formMessage,
-      `Firestore is blocking ${action} because Firebase Anonymous Auth is not active. Enable Anonymous provider and publish the Firestore rules.`,
+      `Firestore is blocking ${action} because you are not signed in with Firebase Auth. Sign in through PingOne and verify your Firestore rules.`,
+      true
+    );
+    return;
+  }
+
+  if (permissionDenied && hasAdminGroupInSession) {
+    setStatusMessage(
+      ui.admin.formMessage,
+      `Firestore blocked ${action}. You are signed in as shakesAdmin in the app session, but Firestore rules only see Firebase token claims. Map groups into request.auth.token.groups or temporarily use allow write: if request.auth != null.`,
       true
     );
     return;

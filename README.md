@@ -7,8 +7,9 @@ NikkiShakes is now a pure static single-page app designed to run on GitHub Pages
 - No Node server required for runtime hosting
 - Hash-based SPA routes: `#/rankings`, `#/login`, `#/admin`
 - Bootstrap 5 UI with animated pastel light/dark themes
-- Rankings data stored in browser localStorage
-- PingOne admin login via OAuth 2.0 Authorization Code + PKCE (browser-only)
+- Firestore real-time rankings data
+- Firebase Authentication with PingOne OpenID Connect login
+- Admin UX gated by PingOne `groups` claim (`shakesAdmin`)
 
 ## Project Layout
 
@@ -18,12 +19,13 @@ NikkiShakes is now a pure static single-page app designed to run on GitHub Pages
 - `scripts/constants.js` shared constants and route/storage keys
 - `scripts/routing.js` hash route parsing and navigation helpers
 - `scripts/themeMode.js` theme initialization and toggling
-- `scripts/clientAuth.js` PingOne PKCE login/callback/session helpers
-- `scripts/pingoneConfig.js` PingOne client configuration for static hosting
+- `scripts/clientAuth.js` Firebase OIDC login/callback/session helpers
+- `scripts/pingoneConfig.js` Firebase OIDC provider configuration
 - `scripts/domUtils.js` DOM utility and safety helpers
-- `scripts/data.js` localStorage data model and normalization
+- `scripts/data.js` Firestore data model and normalization
 - `login.html` and `admin.html` legacy redirects to SPA routes
 - `.github/workflows/pages.yml` automatic GitHub Pages deploy workflow
+- `FIREBASE_OIDC_SETUP.md` step-by-step Firebase + PingOne wiring guide
 
 ## Local Preview (No Node Required)
 
@@ -47,21 +49,19 @@ Serve the repository root and open the generated local URL.
 2. In repository settings, enable Pages and choose GitHub Actions as the source.
 3. The workflow at `.github/workflows/pages.yml` deploys automatically on pushes to `main`.
 
-## PingOne Setup (Static SPA)
+## Firebase + PingOne Setup
 
-1. Open `scripts/pingoneConfig.js` and set:
-	- `enabled: true`
-	- `issuerBaseUrl` or explicit authorize/token endpoints
-	- `clientId`
-2. In PingOne app settings:
-	- Configure redirect URI to your deployed GitHub Pages URL (same value as `redirectUri`)
-	- Use a public client/SPA-style registration with PKCE
-	- Ensure token endpoint CORS supports your Pages origin
-3. Deploy and test login at `#/login`.
+Follow `FIREBASE_OIDC_SETUP.md` for the full checklist. At minimum:
+
+1. Configure OpenID Connect provider in Firebase Authentication.
+2. Ensure your PingOne OIDC app includes scope `shakes`.
+3. Set `firebaseProviderId` in `scripts/pingoneConfig.js`.
+4. Publish Firestore rules that enforce authenticated writes.
+5. Deploy and test login at `#/login`.
 
 ## Security Note
 
-This uses browser-based OAuth for static hosting convenience.
+The UI can hide controls, but Firestore rules are the real security boundary.
 
-- Tokens are held in browser session storage.
-- For highest-security admin controls, a backend BFF remains the preferred architecture.
+- Require Firebase Authentication for writes.
+- Enforce role checks in Firestore rules and/or custom claims for `shakesAdmin`.
