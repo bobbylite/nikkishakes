@@ -4,12 +4,10 @@ NikkiShakes is now a pure static single-page app designed to run on GitHub Pages
 
 ## Highlights
 
-- No Node server required for runtime hosting
-- Hash-based SPA routes: `#/rankings`, `#/login`, `#/admin`
-- Bootstrap 5 UI with animated pastel light/dark themes
-- Firestore real-time rankings data
-- Firebase Authentication with PingOne OpenID Connect login
-- Admin UX gated by PingOne `groups` claim (`shakesAdmin`)
+- No server required for runtime hosting
+- True Single-Page-Application security archiecture 
+- Admin and delegated admin governance and access control flows
+- Powered by GitHub Pages, Google GCP, Cloudflare DNS and PingOne
 
 ## Project Layout
 
