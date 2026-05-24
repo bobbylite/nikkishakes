@@ -1,0 +1,11 @@
+{
+  "name": "nikkishakes-static",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "NikkiShakes static SPA for GitHub Pages",
+  "scripts": {
+    "check": "for f in scripts/*.js; do node --check \"$f\"; done"
+  },
+  "dependencies": {}
+}

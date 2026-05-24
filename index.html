@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NikkiShakes | SPA Rankings</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="styles/main.css" />
+  </head>
+  <body>
+    <div class="bg-blob blob-1"></div>
+    <div class="bg-blob blob-2"></div>
+    <div class="bg-blob blob-3"></div>
+    <div class="noise-overlay"></div>
+
+    <header class="app-header container-xl py-3">
+      <nav class="navbar navbar-expand-lg glass-shell rounded-pill px-3 px-md-4">
+        <a class="navbar-brand d-flex align-items-center gap-2" href="#/rankings" aria-label="NikkiShakes home">
+          <span class="brand-pill">NS</span>
+          <span>
+            <strong class="d-block brand-title">NikkiShakes</strong>
+            <small class="brand-subtitle">Airy rankings. Serious flavor.</small>
+          </span>
+        </a>
+
+        <button
+          class="navbar-toggler border-0 shadow-none"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#mainNav"
+          aria-controls="mainNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+          <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2" id="routeNav">
+            <li class="nav-item">
+              <a class="nav-link" href="#/rankings" data-route-link="rankings">Rankings</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#/login" data-route-link="login">Admin</a>
+            </li>
+            <li class="nav-item ms-lg-2">
+              <button id="themeToggle" class="btn btn-sm btn-theme" type="button" aria-live="polite">
+                Dark mode
+              </button>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xl pb-4">
+      <section id="view-rankings" class="route-view view-enter">
+        <article class="glass-shell hero-panel p-4 p-lg-5 mb-4">
+          <div class="row g-3 align-items-end">
+            <div class="col-lg-8">
+              <p class="eyebrow mb-2">The Definitive Shake Index</p>
+              <h1 class="display-5 fw-semibold mb-3">Discover milkshakes in a floating, live leaderboard.</h1>
+              <p class="hero-copy mb-0">
+                Browse Nikki's rankings by flavor, with smooth transitions, curated notes, and instant updates from local data.
+              </p>
+            </div>
+            <div class="col-lg-4">
+              <label for="flavorSelect" class="form-label fw-semibold">Flavor</label>
+              <select id="flavorSelect" class="form-select form-select-lg" aria-label="Filter by flavor"></select>
+            </div>
+          </div>
+        </article>
+
+        <section id="statsRow" class="row g-3 mb-4"></section>
+
+        <article class="glass-shell p-3 p-md-4">
+          <div class="d-flex justify-content-between align-items-end mb-3 gap-3 flex-wrap">
+            <div>
+              <h2 id="boardTitle" class="h2 mb-1">Vanilla Rankings</h2>
+              <p id="boardMeta" class="text-body-secondary mb-0">Sorted by Nikki score</p>
+            </div>
+          </div>
+          <div id="rankingGrid" class="ranking-grid"></div>
+        </article>
+      </section>
+
+      <section id="view-login" class="route-view d-none">
+        <div class="row justify-content-center">
+          <div class="col-lg-6 col-xl-5">
+            <article class="glass-shell p-4 p-md-5 auth-card">
+              <p class="eyebrow mb-2">Private Portal</p>
+              <h2 class="h1 mb-2">Admin Login</h2>
+              <p class="text-body-secondary mb-4">
+                Sign in with PingOne to unlock admin controls. This static SPA uses OAuth 2.0 Authorization Code with PKCE.
+              </p>
+              <div class="d-grid gap-2">
+                <button id="loginBtn" class="btn btn-primary btn-lg" type="button">Continue with PingOne</button>
+                <a class="btn btn-outline-secondary" href="#/rankings">Back to rankings</a>
+              </div>
+              <p id="authMessage" class="notice mt-3 mb-0" role="status" aria-live="polite"></p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-admin" class="route-view d-none">
+        <div class="row g-4">
+          <div class="col-xl-5">
+            <article class="glass-shell p-4 h-100">
+              <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                  <h2 class="h3 mb-1">Add New Milkshake</h2>
+                  <p class="text-body-secondary mb-0">Add and rank entries instantly.</p>
+                </div>
+                <button id="logoutBtn" class="btn btn-outline-secondary btn-sm" type="button">Log out</button>
+              </div>
+
+              <form id="milkshakeForm" class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="nameInput">Name</label>
+                  <input id="nameInput" class="form-control" name="name" required maxlength="80" placeholder="Vanilla Dream" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="shopInput">Shop</label>
+                  <input id="shopInput" class="form-control" name="shop" required maxlength="80" placeholder="Diner Deluxe" />
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="flavorInput">Flavor</label>
+                  <select id="flavorInput" class="form-select" name="flavor"></select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="ratingInput">Nikki Score (1-10)</label>
+                  <input
+                    id="ratingInput"
+                    class="form-control"
+                    name="rating"
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="0.1"
+                    required
+                    placeholder="9.6"
+                  />
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="photoInput">Photo URL</label>
+                  <input id="photoInput" class="form-control" name="photo" type="url" placeholder="https://..." />
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="notesInput">Notes</label>
+                  <textarea
+                    id="notesInput"
+                    class="form-control"
+                    name="notes"
+                    rows="3"
+                    maxlength="240"
+                    placeholder="Creamy, thick, and unreal vanilla bean finish."
+                  ></textarea>
+                </div>
+                <div class="col-12 d-grid d-sm-flex gap-2 align-items-center">
+                  <button type="submit" class="btn btn-primary">Save Milkshake</button>
+                  <p id="formMessage" class="notice mb-0" role="status" aria-live="polite"></p>
+                </div>
+              </form>
+            </article>
+          </div>
+
+          <div class="col-xl-7">
+            <article class="glass-shell p-4 h-100">
+              <h2 class="h3 mb-1">Current Rankings</h2>
+              <p class="text-body-secondary mb-3">Adjust score instantly and remove entries as needed.</p>
+              <div id="adminList" class="admin-list"></div>
+            </article>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="container-xl pb-4">
+      <div class="glass-shell p-3 px-4 small text-body-secondary">
+        NikkiShakes SPA. Static-ready for GitHub Pages with local leaderboard and Bootstrap interface.
+      </div>
+    </footer>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+    <script type="module" src="scripts/app.js"></script>
+  </body>
+</html>
