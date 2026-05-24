@@ -130,6 +130,10 @@ h4,
   min-height: 74px;
 }
 
+.navbar-surface {
+  border-radius: 999px;
+}
+
 .navbar-brand {
   color: var(--app-ink);
 }
@@ -139,15 +143,17 @@ h4,
   color: var(--app-ink);
 }
 
-.brand-pill {
+.brand-mark {
   width: 42px;
   height: 42px;
   border-radius: 14px;
-  display: grid;
-  place-content: center;
-  background: linear-gradient(140deg, var(--app-brand-a), var(--app-brand-b));
-  color: #0f2832;
-  font-weight: 800;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: 0 6px 16px rgba(12, 26, 32, 0.12);
 }
 
 .brand-subtitle {
@@ -370,8 +376,21 @@ h4,
     top: 0.35rem;
   }
 
+  .navbar-surface {
+    border-radius: 1rem;
+  }
+
   .glass-shell.navbar {
-    border-radius: 1.35rem;
+    border-radius: 1rem;
+  }
+
+  .navbar-collapse {
+    padding-top: 0.75rem;
+  }
+
+  .navbar-collapse .nav-link,
+  .navbar-collapse .btn-theme {
+    border-radius: 0.75rem;
   }
 
   .admin-item {
