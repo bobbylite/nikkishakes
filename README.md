@@ -1,13 +1,16 @@
 # NikkiShakes SPA (Static)
 
-NikkiShakes is now a pure static single-page app designed to run on GitHub Pages.
+**Live site: [nikkishakes.com](https://nikkishakes.com)**
+
+NikkiShakes is a pure static single-page app designed to run on GitHub Pages.
 
 ## Highlights
 
 - No server required for runtime hosting
 - True Single-Page-Application security archiecture 
 - Admin and delegated admin governance and access control flows
-- Powered by GitHub Pages, Google GCP, Cloudflare DNS and PingOne
+- Source hosted on GitHub, served via GitHub Pages, secured by Cloudflare (DNS + edge security), with PingOne as the identity provider (FIDO2 passkeys, real-time risk analysis, identity verification, orchestration, and authorization), and Firebase (Google GCP) for data persistence
+
 
 ## Project Layout
 
