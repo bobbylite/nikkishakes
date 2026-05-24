@@ -11,6 +11,7 @@ export const pingOneConfig = {
   // Optional endpoint overrides.
   authorizeEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/authorize",
   tokenEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/token",
+  introspectionEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/introspect",
   endSessionEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/signoff",
 
   clientId: "f7383847-2e3f-4dc5-a98b-19841f5ff1a3",
@@ -21,5 +22,5 @@ export const pingOneConfig = {
   // Optional logout return route.
   postLogoutRedirectUri: `${originPath}#/login?loggedOut=1`,
 
-  scopes: "openid profile email"
+  scopes: "openid profile email shakes"
 };

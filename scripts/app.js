@@ -1,5 +1,12 @@
 import { DEFAULT_FLAVOR, FLAVORS, ROUTES } from "./constants.js";
-import { beginLogin, handleAuthCallbackIfPresent, isAuthenticated, logout } from "./clientAuth.js";
+import {
+  beginLogin,
+  ensureAuthorizationState,
+  handleAuthCallbackIfPresent,
+  hasAdminAccess,
+  isAuthenticated,
+  logout
+} from "./clientAuth.js";
 import { byId, clearChildren, escapeHtml, setStatusMessage } from "./domUtils.js";
 import { parseQueryFromHash, parseRouteFromHash, navigateTo } from "./routing.js";
 import { initializeTheme, toggleTheme } from "./themeMode.js";
@@ -51,8 +58,12 @@ const ui = {
 
 const state = {
   selectedFlavor: DEFAULT_FLAVOR,
-  authenticated: false
+  authenticated: false,
+  adminAuthorized: false
 };
+
+const ACCESS_REQUEST_MESSAGE =
+  "Your account is signed in, but admin access is limited to shakesAdmin members. Please request access from the owner or an existing admin.";
 
 void initialize();
 
@@ -63,7 +74,7 @@ async function initialize() {
   await initializeFirestore();
   bindEventHandlers();
   setupRealtimeSync();
-  renderFromRoute();
+  await renderFromRoute();
 }
 
 function setupRealtimeSync() {
@@ -72,7 +83,7 @@ function setupRealtimeSync() {
     if (route === ROUTES.rankings) {
       renderRankings();
     } else if (route === ROUTES.admin) {
-      renderAdminList();
+      renderAdmin();
     }
   });
 }
@@ -99,7 +110,9 @@ function bindEventHandlers() {
     navigateTo(ROUTES.login, { loggedOut: 1 });
   });
 
-  window.addEventListener("hashchange", renderFromRoute);
+  window.addEventListener("hashchange", () => {
+    void renderFromRoute();
+  });
 }
 
 function initializeFlavorSelects() {
@@ -126,7 +139,7 @@ function initializeFlavorSelects() {
   ui.admin.flavorInput.value = DEFAULT_FLAVOR;
 }
 
-function renderFromRoute() {
+async function renderFromRoute() {
   state.authenticated = isAuthenticated();
 
   const route = parseRouteFromHash(window.location.hash);
@@ -135,6 +148,18 @@ function renderFromRoute() {
   if (route === ROUTES.admin && !state.authenticated) {
     navigateTo(ROUTES.login);
     return;
+  }
+
+  if (route === ROUTES.admin && state.authenticated) {
+    const authorization = await ensureAuthorizationState();
+    state.adminAuthorized = authorization.ok ? authorization.authorized : false;
+
+    if (!authorization.ok && !isAuthenticated()) {
+      navigateTo(ROUTES.login, { error: authorization.error || "auth-expired" });
+      return;
+    }
+  } else {
+    state.adminAuthorized = hasAdminAccess();
   }
 
   updateNavState(route);
@@ -318,19 +343,32 @@ function renderRankingCards(gridNode, ranked) {
 }
 
 function renderAdmin() {
+  state.adminAuthorized = hasAdminAccess();
+
   if (ui.admin.flavorInput) {
     ui.admin.flavorInput.value = DEFAULT_FLAVOR;
   }
 
   if (ui.admin.formMessage) {
-    setStatusMessage(ui.admin.formMessage, "");
+    setStatusMessage(
+      ui.admin.formMessage,
+      state.adminAuthorized ? "" : ACCESS_REQUEST_MESSAGE,
+      false
+    );
   }
+
+  setAdminControlsEnabled(state.adminAuthorized);
 
   renderAdminList();
 }
 
 function onAdminFormSubmit(event) {
   event.preventDefault();
+  if (!state.adminAuthorized) {
+    setStatusMessage(ui.admin.formMessage, ACCESS_REQUEST_MESSAGE, false);
+    return;
+  }
+
   const formData = new FormData(ui.admin.form);
 
   const payload = {
@@ -358,6 +396,10 @@ function onAdminFormSubmit(event) {
 }
 
 function onAdminListClick(event) {
+  if (!state.adminAuthorized) {
+    return;
+  }
+
   const deleteButton = event.target.closest("button[data-action='delete']");
   if (!deleteButton) {
     return;
@@ -374,6 +416,10 @@ function onAdminListClick(event) {
 }
 
 function onAdminListChange(event) {
+  if (!state.adminAuthorized) {
+    return;
+  }
+
   const ratingInput = event.target.closest("input[data-action='rating']");
   if (!ratingInput) {
     return;
@@ -395,7 +441,9 @@ function renderAdminList() {
   clearChildren(ui.admin.adminList);
 
   if (!ranked.length) {
-    ui.admin.adminList.innerHTML = '<p class="text-body-secondary mb-0">No shakes yet. Add one above.</p>';
+    ui.admin.adminList.innerHTML = state.adminAuthorized
+      ? '<p class="text-body-secondary mb-0">No shakes yet. Add one above.</p>'
+      : '<p class="text-body-secondary mb-0">Access request pending. Once approved, your admin tools will appear here.</p>';
     return;
   }
 
@@ -403,7 +451,8 @@ function renderAdminList() {
     const rowNode = document.createElement("article");
     rowNode.className = "admin-item stagger-item";
     rowNode.style.setProperty("--delay", `${index * 35}ms`);
-    rowNode.innerHTML = `
+    rowNode.innerHTML = state.adminAuthorized
+      ? `
       <div>
         <strong>${escapeHtml(shake.name)}</strong>
         <p class="meta">${escapeHtml(shake.shop)} · ${escapeHtml(shake.flavor)}</p>
@@ -424,7 +473,21 @@ function renderAdminList() {
         />
       </div>
       <button class="btn btn-outline-danger btn-sm" data-action="delete" data-id="${shake.id}">Delete</button>
+    `
+      : `
+      <div>
+        <strong>${escapeHtml(shake.name)}</strong>
+        <p class="meta mb-0">${escapeHtml(shake.shop)} · ${escapeHtml(shake.flavor)}</p>
+      </div>
+      <p class="meta mb-0">${escapeHtml(shake.notes || "No notes")}</p>
+      <p class="badge text-bg-light border rounded-pill align-self-start mb-0">Score ${Number(shake.rating).toFixed(1)}</p>
     `;
     ui.admin.adminList.append(rowNode);
+  });
+}
+
+function setAdminControlsEnabled(isEnabled) {
+  ui.admin.form?.querySelectorAll("input, select, textarea, button[type='submit']").forEach((node) => {
+    node.disabled = !isEnabled;
   });
 }

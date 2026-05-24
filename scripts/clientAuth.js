@@ -3,12 +3,71 @@ import { pingOneConfig } from "./pingoneConfig.js";
 
 export function isAuthenticated() {
   const session = readSession();
-  if (!session || !session.accessToken || Number(session.expiresAt) <= Date.now()) {
+  if (
+    !session ||
+    !session.accessToken ||
+    Number(session.expiresAt) <= Date.now() ||
+    session.active === false
+  ) {
     clearSession();
     return false;
   }
 
   return true;
+}
+
+export function hasAdminAccess() {
+  const session = readSession();
+  return Boolean(
+    session &&
+      session.accessToken &&
+      Number(session.expiresAt) > Date.now() &&
+      session.active !== false &&
+      Array.isArray(session.groups) &&
+      session.groups.includes("shakesAdmin")
+  );
+}
+
+export async function ensureAuthorizationState() {
+  const session = readSession();
+  if (
+    !session ||
+    !session.accessToken ||
+    Number(session.expiresAt) <= Date.now() ||
+    session.active === false
+  ) {
+    clearSession();
+    return { ok: false, authorized: false };
+  }
+
+  if (Array.isArray(session.groups) && typeof session.active === "boolean") {
+    if (!session.active) {
+      clearSession();
+      return { ok: false, authorized: false };
+    }
+    return { ok: true, authorized: session.active && session.groups.includes("shakesAdmin") };
+  }
+
+  const result = await introspectAccessToken(session.accessToken);
+  if (!result.ok) {
+    clearSession();
+    return { ok: false, authorized: false, error: result.error };
+  }
+
+  saveSession({
+    ...session,
+    active: result.active,
+    groups: result.groups,
+    claims: result.claims,
+    introspectedAt: Date.now()
+  });
+
+  if (!result.active) {
+    clearSession();
+    return { ok: false, authorized: false };
+  }
+
+  return { ok: true, authorized: result.active && result.groups.includes("shakesAdmin") };
 }
 
 export async function beginLogin() {
@@ -106,19 +165,43 @@ export async function handleAuthCallbackIfPresent() {
     }
 
     const expiresAt = Date.now() + Number(parsed?.expires_in || 3600) * 1000;
-    sessionStorage.setItem(
-      STORAGE_KEYS.authSession,
-      JSON.stringify({
-        accessToken: parsed?.access_token,
-        idToken: parsed?.id_token || "",
-        refreshToken: parsed?.refresh_token || "",
-        expiresAt
-      })
-    );
+    saveSession({
+      accessToken: parsed?.access_token,
+      idToken: parsed?.id_token || "",
+      refreshToken: parsed?.refresh_token || "",
+      expiresAt
+    });
+
+    const introspection = await introspectAccessToken(parsed?.access_token);
+    if (!introspection.ok) {
+      clearSession();
+      clearOAuthContext();
+      cleanupCallbackQuery();
+      return {
+        handled: true,
+        ok: false,
+        error: introspection.error || "introspection-failed"
+      };
+    }
+
+    saveSession({
+      accessToken: parsed?.access_token,
+      idToken: parsed?.id_token || "",
+      refreshToken: parsed?.refresh_token || "",
+      expiresAt,
+      active: introspection.active,
+      groups: introspection.groups,
+      claims: introspection.claims,
+      introspectedAt: Date.now()
+    });
 
     clearOAuthContext();
     cleanupCallbackQuery();
-    return { handled: true, ok: true };
+    return {
+      handled: true,
+      ok: true,
+      authorized: introspection.active && introspection.groups.includes("shakesAdmin")
+    };
   } catch {
     clearOAuthContext();
     cleanupCallbackQuery();
@@ -157,6 +240,9 @@ function resolveOauthConfig() {
   const authorizeUrl =
     pingOneConfig.authorizeEndpoint || (issuerBase ? `${issuerBase}/authorize` : "");
   const tokenUrl = pingOneConfig.tokenEndpoint || (issuerBase ? `${issuerBase}/access_token` : "");
+  const introspectionUrl =
+    pingOneConfig.introspectionEndpoint ||
+    (issuerBase ? `${issuerBase}/introspect` : tokenUrl.replace(/\/token$/, "/introspect"));
 
   const endSessionUrl =
     pingOneConfig.endSessionEndpoint ||
@@ -178,6 +264,7 @@ function resolveOauthConfig() {
     scopes: pingOneConfig.scopes || "openid profile email",
     authorizeUrl,
     tokenUrl,
+    introspectionUrl,
     endSessionUrl
   };
 }
@@ -207,6 +294,10 @@ function clearSession() {
   clearOAuthContext();
 }
 
+function saveSession(nextSession) {
+  sessionStorage.setItem(STORAGE_KEYS.authSession, JSON.stringify(nextSession));
+}
+
 function clearOAuthContext() {
   sessionStorage.removeItem(STORAGE_KEYS.oauthContext);
 }
@@ -221,6 +312,50 @@ function parseJsonSafe(value) {
     return JSON.parse(value);
   } catch {
     return null;
+  }
+}
+
+async function introspectAccessToken(accessToken) {
+  const resolved = resolveOauthConfig();
+  if (!resolved.enabled || !resolved.introspectionUrl || !accessToken) {
+    return { ok: false, error: "introspection-unavailable" };
+  }
+
+  try {
+    const body = new URLSearchParams({
+      token: accessToken,
+      client_id: resolved.clientId,
+      token_type_hint: "access_token"
+    });
+
+    const response = await fetch(resolved.introspectionUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: body.toString()
+    });
+
+    const raw = await response.text();
+    const parsed = parseJsonSafe(raw);
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: parsed?.error || `introspection-${response.status}`
+      };
+    }
+
+    const groups = Array.isArray(parsed?.groups) ? parsed.groups : [];
+
+    return {
+      ok: true,
+      active: Boolean(parsed?.active),
+      groups,
+      claims: parsed || {}
+    };
+  } catch {
+    return { ok: false, error: "introspection-network" };
   }
 }
 
