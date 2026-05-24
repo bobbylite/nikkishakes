@@ -9,7 +9,9 @@ import {
   getShakes,
   groupByFlavor,
   sortByRatingDesc,
-  updateShake
+  updateShake,
+  initializeFirestore,
+  onDataChange
 } from "./data.js";
 
 const FALLBACK_PHOTO_URL =
@@ -58,8 +60,21 @@ async function initialize() {
   initializeTheme(ui.themeToggle);
   initializeFlavorSelects();
   await processAuthCallback();
+  await initializeFirestore();
   bindEventHandlers();
+  setupRealtimeSync();
   renderFromRoute();
+}
+
+function setupRealtimeSync() {
+  onDataChange(() => {
+    const route = parseRouteFromHash(window.location.hash);
+    if (route === ROUTES.rankings) {
+      renderRankings();
+    } else if (route === ROUTES.admin) {
+      renderAdminList();
+    }
+  });
 }
 
 function bindEventHandlers() {
@@ -332,11 +347,14 @@ function onAdminFormSubmit(event) {
     return;
   }
 
-  addShake(payload);
-  ui.admin.form.reset();
-  ui.admin.flavorInput.value = DEFAULT_FLAVOR;
-  setStatusMessage(ui.admin.formMessage, "Milkshake saved.");
-  renderAdminList();
+  void addShake(payload).then(() => {
+    ui.admin.form.reset();
+    ui.admin.flavorInput.value = DEFAULT_FLAVOR;
+    setStatusMessage(ui.admin.formMessage, "Milkshake saved.");
+  }).catch((err) => {
+    console.error("Error adding shake:", err);
+    setStatusMessage(ui.admin.formMessage, "Error saving milkshake.", true);
+  });
 }
 
 function onAdminListClick(event) {
@@ -350,8 +368,9 @@ function onAdminListClick(event) {
     return;
   }
 
-  deleteShake(id);
-  renderAdminList();
+  void deleteShake(id).catch((err) => {
+    console.error("Error deleting shake:", err);
+  });
 }
 
 function onAdminListChange(event) {
@@ -366,8 +385,9 @@ function onAdminListChange(event) {
     return;
   }
 
-  updateShake(id, { rating: nextRating });
-  renderAdminList();
+  void updateShake(id, { rating: nextRating }).catch((err) => {
+    console.error("Error updating shake:", err);
+  });
 }
 
 function renderAdminList() {

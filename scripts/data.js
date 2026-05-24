@@ -1,53 +1,132 @@
 import { DEFAULT_FLAVOR, FLAVORS, STORAGE_KEYS } from "./constants.js";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
 
 export { DEFAULT_FLAVOR, FLAVORS };
 
-const KEY = STORAGE_KEYS.milkshakes;
+let db;
+let unsubscribe = null;
+let cachedShakes = [];
+let dataChangeCallbacks = [];
+let hasCheckedSeedData = false;
+
+// Initialize Firestore connection
+export function initializeFirestore() {
+  return new Promise((resolve) => {
+    // Wait for Firebase app to be initialized
+    if (!window.firebaseApp) {
+      const checkApp = setInterval(() => {
+        if (window.firebaseApp) {
+          clearInterval(checkApp);
+          void setupFirestoreAfterAuth().then(resolve);
+        }
+      }, 100);
+    } else {
+      void setupFirestoreAfterAuth().then(resolve);
+    }
+  });
+}
+
+async function setupFirestoreAfterAuth() {
+  if (window.firebaseAuthReady) {
+    await window.firebaseAuthReady;
+  }
+
+  db = getFirestore(window.firebaseApp);
+  setupRealtimeListener();
+}
+
+// Real-time listener for Firestore collection
+function setupRealtimeListener() {
+  if (!db || unsubscribe) return;
+
+  const q = query(collection(db, "shakes"));
+  unsubscribe = onSnapshot(q, (snapshot) => {
+    cachedShakes = snapshot.docs.map(doc => normalizeShake({ id: doc.id, ...doc.data() })).filter(Boolean);
+    notifyDataChange();
+  });
+}
+
+// Register callback for when data changes
+export function onDataChange(callback) {
+  dataChangeCallbacks.push(callback);
+}
+
+function notifyDataChange() {
+  dataChangeCallbacks.forEach(cb => {
+    try {
+      cb(cachedShakes);
+    } catch (err) {
+      console.error("Error in data change callback:", err);
+    }
+  });
+}
 
 const seedShakes = [
   {
-    id: crypto.randomUUID(),
     name: "Vanilla Cloud",
     shop: "Soda & Co",
     flavor: "Vanilla",
     rating: 9.4,
-    photo:
-      "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=900&q=80",
+    photo: "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=900&q=80",
     notes: "Classic vanilla bean flavor and perfect texture.",
     createdAt: new Date().toISOString()
   },
   {
-    id: crypto.randomUUID(),
     name: "Midnight Cocoa",
     shop: "Churn Club",
     flavor: "Chocolate",
     rating: 8.8,
-    photo:
-      "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?auto=format&fit=crop&w=900&q=80",
+    photo: "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?auto=format&fit=crop&w=900&q=80",
     notes: "Deep cocoa profile with soft whipped cream.",
     createdAt: new Date().toISOString()
   }
 ];
 
 export function getShakes() {
-  const parsed = safeReadArray(KEY);
-  if (!parsed) {
-    saveShakes(seedShakes);
-    return [...seedShakes];
+  if (!db) {
+    void initializeFirestore().then(() => {
+      void seedIfCollectionEmpty();
+    });
+    return cachedShakes;
   }
 
-  return parsed.map(normalizeShake).filter(Boolean);
+  void seedIfCollectionEmpty();
+  return cachedShakes;
 }
 
-export function saveShakes(shakes) {
-  localStorage.setItem(KEY, JSON.stringify(shakes));
+async function seedIfCollectionEmpty() {
+  if (!db || hasCheckedSeedData) {
+    return;
+  }
+
+  hasCheckedSeedData = true;
+
+  try {
+    const snapshot = await getDocs(collection(db, "shakes"));
+    if (!snapshot.empty) {
+      return;
+    }
+
+    for (const shake of seedShakes) {
+      const normalized = normalizeShake(shake);
+      try {
+        await addDoc(collection(db, "shakes"), normalized);
+      } catch (err) {
+        console.error("Error seeding data:", err);
+      }
+    }
+  } catch (err) {
+    console.error("Error checking seed data:", err);
+  }
 }
 
-export function addShake(shake) {
-  const shakes = getShakes();
+export async function addShake(shake) {
+  if (!db) {
+    await initializeFirestore();
+  }
+
   const payload = normalizeShake({
     ...shake,
-    id: crypto.randomUUID(),
     createdAt: new Date().toISOString()
   });
 
@@ -55,33 +134,51 @@ export function addShake(shake) {
     throw new Error("Invalid shake payload");
   }
 
-  shakes.push(payload);
-  saveShakes(shakes);
-  return payload;
+  try {
+    const docRef = await addDoc(collection(db, "shakes"), payload);
+    return { ...payload, id: docRef.id };
+  } catch (err) {
+    console.error("Error adding shake:", err);
+    throw err;
+  }
 }
 
-export function updateShake(id, updates) {
-  const shakes = getShakes();
-  const next = shakes.map((shake) => {
-    if (shake.id !== id) {
-      return shake;
-    }
-    return normalizeShake({
-      ...shake,
-      ...updates
-    });
-  });
+export async function updateShake(id, updates) {
+  if (!db) {
+    await initializeFirestore();
+  }
 
-  saveShakes(next.filter(Boolean));
+  const normalized = normalizeShake(updates);
+  if (!normalized) {
+    throw new Error("Invalid updates");
+  }
+
+  try {
+    await updateDoc(doc(db, "shakes", id), normalized);
+  } catch (err) {
+    console.error("Error updating shake:", err);
+    throw err;
+  }
 }
 
-export function deleteShake(id) {
-  const shakes = getShakes();
-  const next = shakes.filter((shake) => shake.id !== id);
-  saveShakes(next);
+export async function deleteShake(id) {
+  if (!db) {
+    await initializeFirestore();
+  }
+
+  try {
+    await deleteDoc(doc(db, "shakes", id));
+  } catch (err) {
+    console.error("Error deleting shake:", err);
+    throw err;
+  }
 }
 
 export function groupByFlavor(shakes) {
+  if (!Array.isArray(shakes)) {
+    return {};
+  }
+
   return shakes.reduce((acc, shake) => {
     const flavor = shake.flavor || DEFAULT_FLAVOR;
     if (!acc[flavor]) {
@@ -93,21 +190,11 @@ export function groupByFlavor(shakes) {
 }
 
 export function sortByRatingDesc(shakes) {
-  return [...shakes].sort((a, b) => Number(b.rating) - Number(a.rating));
-}
-
-function safeReadArray(key) {
-  const raw = localStorage.getItem(key);
-  if (!raw) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
+  if (!Array.isArray(shakes)) {
     return [];
   }
+
+  return [...shakes].sort((a, b) => Number(b.rating) - Number(a.rating));
 }
 
 function normalizeShake(value) {
@@ -119,7 +206,6 @@ function normalizeShake(value) {
   const normalizedRating = Number.isFinite(rating) ? Math.max(1, Math.min(10, rating)) : 1;
 
   return {
-    id: String(value.id || crypto.randomUUID()),
     name: String(value.name || "Untitled Shake").trim() || "Untitled Shake",
     shop: String(value.shop || "Unknown Shop").trim() || "Unknown Shop",
     flavor: FLAVORS.includes(value.flavor) ? value.flavor : DEFAULT_FLAVOR,

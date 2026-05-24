@@ -1,0 +1,35 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-analytics.js";
+import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-auth.js";
+import { firebaseConfig } from "./firebaseConfig.js";
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+const auth = getAuth(app);
+
+const authReady = new Promise((resolve) => {
+	const unsubscribe = onAuthStateChanged(auth, async (user) => {
+		if (user) {
+			unsubscribe();
+			resolve();
+			return;
+		}
+
+		try {
+			await signInAnonymously(auth);
+		} catch (err) {
+			console.error(
+				"Firebase anonymous auth failed. Enable Anonymous provider in Firebase Console > Authentication > Sign-in method.",
+				err
+			);
+			unsubscribe();
+			resolve();
+		}
+	});
+});
+
+// Make Firebase app globally available
+window.firebaseApp = app;
+window.firebaseAuth = auth;
+window.firebaseAuthReady = authReady;
