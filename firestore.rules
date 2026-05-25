@@ -1,11 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /shakes/{document=**} {
+    match /shakes/{shakeId} {
       allow read: if true;
       allow write: if request.auth != null
         && request.auth.token.groups is list
-        && request.auth.token.groups.hasAny(['shakesAdmin']);
+        && (
+          request.auth.token.groups.hasAny(['shakesAdmin'])
+          || (
+            request.auth.token.groups.hasAny(['shakesRanker'])
+            && (
+              resource == null
+                ? request.resource.data.uuid == request.auth.uid
+                : resource.data.uuid == request.auth.uid
+            )
+          )
+        );
     }
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;

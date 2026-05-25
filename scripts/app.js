@@ -4,6 +4,7 @@ import {
   ensureAuthorizationState,
   handleAuthCallbackIfPresent,
   hasAdminAccess,
+  hasRankerAccess,
   isAuthenticated,
   logout
 } from "./clientAuth.js";
@@ -60,7 +61,8 @@ const ui = {
 const state = {
   selectedFlavor: DEFAULT_FLAVOR,
   authenticated: false,
-  adminAuthorized: false
+  adminAuthorized: false,
+  rankerAuthorized: false
 };
 
 const ACCESS_REQUEST_MESSAGE =
@@ -166,6 +168,7 @@ async function renderFromRoute() {
     if (state.authenticated) {
       const authorization = await ensureAuthorizationState();
       state.adminAuthorized = authorization.ok ? authorization.authorized : false;
+      state.rankerAuthorized = !state.adminAuthorized && hasRankerAccess();
       if (!authorization.ok && !isAuthenticated()) {
         navigateTo(ROUTES.login, { error: authorization.error || "auth-expired" });
         return;
@@ -183,6 +186,7 @@ async function renderFromRoute() {
   if (route === ROUTES.admin && state.authenticated) {
     const authorization = await ensureAuthorizationState();
     state.adminAuthorized = authorization.ok ? authorization.authorized : false;
+    state.rankerAuthorized = !state.adminAuthorized && hasRankerAccess();
 
     if (!authorization.ok && !isAuthenticated()) {
       navigateTo(ROUTES.login, { error: authorization.error || "auth-expired" });
@@ -190,6 +194,7 @@ async function renderFromRoute() {
     }
   } else {
     state.adminAuthorized = hasAdminAccess();
+    state.rankerAuthorized = !state.adminAuthorized && hasRankerAccess();
   }
 
   updateNavState(route);
@@ -374,6 +379,9 @@ function renderRankingCards(gridNode, ranked) {
 
 function renderAdmin() {
   state.adminAuthorized = hasAdminAccess();
+  state.rankerAuthorized = !state.adminAuthorized && hasRankerAccess();
+
+  const hasWriteAccess = state.adminAuthorized || state.rankerAuthorized;
 
   if (ui.admin.flavorInput) {
     ui.admin.flavorInput.value = DEFAULT_FLAVOR;
@@ -382,19 +390,19 @@ function renderAdmin() {
   if (ui.admin.formMessage) {
     setStatusMessage(
       ui.admin.formMessage,
-      state.adminAuthorized ? "" : ACCESS_REQUEST_MESSAGE,
+      hasWriteAccess ? "" : ACCESS_REQUEST_MESSAGE,
       false
     );
   }
 
-  setAdminControlsEnabled(state.adminAuthorized);
+  setAdminControlsEnabled(hasWriteAccess);
 
   renderAdminList();
 }
 
 function onAdminFormSubmit(event) {
   event.preventDefault();
-  if (!state.adminAuthorized) {
+  if (!state.adminAuthorized && !state.rankerAuthorized) {
     setStatusMessage(ui.admin.formMessage, ACCESS_REQUEST_MESSAGE, false);
     return;
   }
@@ -407,7 +415,8 @@ function onAdminFormSubmit(event) {
     flavor: String(formData.get("flavor") || DEFAULT_FLAVOR),
     rating: Number(formData.get("rating")),
     photo: String(formData.get("photo") || "").trim(),
-    notes: String(formData.get("notes") || "").trim()
+    notes: String(formData.get("notes") || "").trim(),
+    uuid: window.firebaseAuth?.currentUser?.uid || ""
   };
 
   if (!payload.name || !payload.shop || Number.isNaN(payload.rating) || payload.rating < 1 || payload.rating > 10) {
@@ -426,7 +435,19 @@ function onAdminFormSubmit(event) {
 }
 
 function onAdminListClick(event) {
-  if (!state.adminAuthorized) {
+  const unlockButton = event.target.closest("button[data-action='unlock-shake']");
+  if (unlockButton) {
+    const article = unlockButton.closest("article");
+    article.querySelector(".shake-summary").classList.add("d-none");
+    article.querySelector(".shake-edit").classList.remove("d-none");
+    return;
+  }
+
+  const lockButton = event.target.closest("button[data-action='lock-shake']");
+  if (lockButton) {
+    const article = lockButton.closest("article");
+    article.querySelector(".shake-summary").classList.remove("d-none");
+    article.querySelector(".shake-edit").classList.add("d-none");
     return;
   }
 
@@ -437,6 +458,13 @@ function onAdminListClick(event) {
 
   const id = deleteButton.dataset.id;
   if (!id) {
+    return;
+  }
+
+  const currentUid = window.firebaseAuth?.currentUser?.uid || "";
+  const canDelete = state.adminAuthorized ||
+    (state.rankerAuthorized && deleteButton.dataset.uuid === currentUid);
+  if (!canDelete) {
     return;
   }
 
@@ -454,12 +482,15 @@ function onAdminListClick(event) {
 }
 
 function onAdminListChange(event) {
-  if (!state.adminAuthorized) {
+  const editableInput = event.target.closest("[data-action='field']");
+  if (!editableInput) {
     return;
   }
 
-  const editableInput = event.target.closest("[data-action='field']");
-  if (!editableInput) {
+  const currentUid = window.firebaseAuth?.currentUser?.uid || "";
+  const canEdit = state.adminAuthorized ||
+    (state.rankerAuthorized && editableInput.dataset.uuid === currentUid);
+  if (!canEdit) {
     return;
   }
 
@@ -511,79 +542,104 @@ function renderAdminList() {
   const ranked = sortByRatingDesc(getShakes());
   clearChildren(ui.admin.adminList);
 
+  const currentUid = window.firebaseAuth?.currentUser?.uid || "";
+  const hasWriteAccess = state.adminAuthorized || state.rankerAuthorized;
+
   if (!ranked.length) {
-    ui.admin.adminList.innerHTML = state.adminAuthorized
+    ui.admin.adminList.innerHTML = hasWriteAccess
       ? '<p class="text-body-secondary mb-0">No shakes yet. Add one above.</p>'
       : '<p class="text-body-secondary mb-0">Access request pending. Once approved, your admin tools will appear here.</p>';
     return;
   }
 
   ranked.forEach((shake, index) => {
+    const canEdit = state.adminAuthorized ||
+      (state.rankerAuthorized && shake.uuid === currentUid);
+    const shakeUuid = shake.uuid || "";
+
     const rowNode = document.createElement("article");
     rowNode.className = "admin-item stagger-item";
     rowNode.style.setProperty("--delay", `${index * 35}ms`);
-    rowNode.innerHTML = state.adminAuthorized
+    rowNode.innerHTML = canEdit
       ? `
-      <div class="admin-edit-grid">
+      <div class="shake-summary">
         <div>
-          <label class="small text-body-secondary" for="name-${shake.id}">Name</label>
-          <input
-            id="name-${shake.id}"
-            class="form-control form-control-sm"
-            data-action="field"
-            data-field="name"
-            data-id="${shake.id}"
-            data-original="${escapeHtml(shake.name)}"
-            type="text"
-            maxlength="80"
-            value="${escapeHtml(shake.name)}"
-          />
-          <p class="meta mt-1 mb-0">${escapeHtml(shake.shop)} · ${escapeHtml(shake.flavor)}</p>
+          <strong>${escapeHtml(shake.name)}</strong>
+          <p class="meta mb-0">${escapeHtml(shake.shop)} · ${escapeHtml(shake.flavor)}</p>
         </div>
-        <div>
-          <label class="small text-body-secondary" for="notes-${shake.id}">Description</label>
-          <textarea
-            id="notes-${shake.id}"
-            class="form-control form-control-sm"
-            data-action="field"
-            data-field="notes"
-            data-id="${shake.id}"
-            data-original="${escapeHtml(shake.notes || "")}" 
-            rows="2"
-            maxlength="240"
-          >${escapeHtml(shake.notes || "")}</textarea>
+        <p class="meta mb-0">${escapeHtml(shake.notes || "No notes")}</p>
+        <p class="badge text-bg-light border rounded-pill align-self-start mb-0">Score ${Number(shake.rating).toFixed(1)}</p>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-action="unlock-shake" data-id="${shake.id}">Edit</button>
+      </div>
+      <div class="shake-edit d-none">
+        <div class="admin-edit-grid">
+          <div>
+            <label class="small text-body-secondary" for="name-${shake.id}">Name</label>
+            <input
+              id="name-${shake.id}"
+              class="form-control form-control-sm"
+              data-action="field"
+              data-field="name"
+              data-id="${shake.id}"
+              data-uuid="${shakeUuid}"
+              data-original="${escapeHtml(shake.name)}"
+              type="text"
+              maxlength="80"
+              value="${escapeHtml(shake.name)}"
+            />
+            <p class="meta mt-1 mb-0">${escapeHtml(shake.shop)} · ${escapeHtml(shake.flavor)}</p>
+          </div>
+          <div>
+            <label class="small text-body-secondary" for="notes-${shake.id}">Description</label>
+            <textarea
+              id="notes-${shake.id}"
+              class="form-control form-control-sm"
+              data-action="field"
+              data-field="notes"
+              data-id="${shake.id}"
+              data-uuid="${shakeUuid}"
+              data-original="${escapeHtml(shake.notes || "")}"
+              rows="2"
+              maxlength="240"
+            >${escapeHtml(shake.notes || "")}</textarea>
+          </div>
+          <div>
+            <label class="small text-body-secondary" for="photo-${shake.id}">Photo URL</label>
+            <input
+              id="photo-${shake.id}"
+              class="form-control form-control-sm"
+              data-action="field"
+              data-field="photo"
+              data-id="${shake.id}"
+              data-uuid="${shakeUuid}"
+              data-original="${escapeHtml(shake.photo || "")}"
+              type="url"
+              value="${escapeHtml(shake.photo || "")}"
+            />
+          </div>
         </div>
-        <div>
-          <label class="small text-body-secondary" for="photo-${shake.id}">Photo URL</label>
+        <div class="d-flex align-items-center gap-2 justify-content-start justify-content-lg-end">
+          <label class="small text-body-secondary" for="rate-${shake.id}">Score</label>
           <input
-            id="photo-${shake.id}"
-            class="form-control form-control-sm"
+            id="rate-${shake.id}"
+            class="form-control form-control-sm admin-score"
             data-action="field"
-            data-field="photo"
+            data-field="rating"
             data-id="${shake.id}"
-            data-original="${escapeHtml(shake.photo || "")}"
-            type="url"
-            value="${escapeHtml(shake.photo || "")}"
+            data-uuid="${shakeUuid}"
+            data-original="${Number(shake.rating).toFixed(1)}"
+            type="number"
+            min="1"
+            max="10"
+            step="0.1"
+            value="${Number(shake.rating).toFixed(1)}"
           />
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-action="lock-shake" data-id="${shake.id}">Done</button>
+          <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" data-id="${shake.id}" data-uuid="${shakeUuid}">Delete</button>
         </div>
       </div>
-      <div class="d-flex align-items-center gap-2 justify-content-start justify-content-lg-end">
-        <label class="small text-body-secondary" for="rate-${shake.id}">Score</label>
-        <input
-          id="rate-${shake.id}"
-          class="form-control form-control-sm admin-score"
-          data-action="field"
-          data-field="rating"
-          data-id="${shake.id}"
-          data-original="${Number(shake.rating).toFixed(1)}"
-          type="number"
-          min="1"
-          max="10"
-          step="0.1"
-          value="${Number(shake.rating).toFixed(1)}"
-        />
-      </div>
-      <button type="button" class="btn btn-outline-danger btn-sm" data-action="delete" data-id="${shake.id}">Delete</button>
     `
       : `
       <div>

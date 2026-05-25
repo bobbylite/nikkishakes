@@ -139,6 +139,10 @@ export async function addShake(shake) {
     throw new Error("Invalid shake payload");
   }
 
+  if (shake.uuid) {
+    payload.uuid = String(shake.uuid);
+  }
+
   try {
     const docRef = await addDoc(collection(db, "shakes"), payload);
     return { ...payload, id: docRef.id };

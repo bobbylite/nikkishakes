@@ -12,6 +12,7 @@ import {
 const DEFAULT_SCOPES = "openid profile email shakes";
 const DEFAULT_PROVIDER_ID = "oidc.pingone";
 const REQUIRED_ADMIN_GROUP = pingOneConfig.requiredAdminGroup || "shakesAdmin";
+const REQUIRED_RANKER_GROUP = "shakesRanker";
 const DEFAULT_LOGIN_MODE = "auto";
 
 export function isAuthenticated() {
@@ -25,6 +26,16 @@ export function hasAdminAccess() {
       session?.active !== false &&
       Array.isArray(session?.groups) &&
       session.groups.includes(REQUIRED_ADMIN_GROUP)
+  );
+}
+
+export function hasRankerAccess() {
+  const session = readSession();
+  return Boolean(
+    window.firebaseAuth?.currentUser &&
+      session?.active !== false &&
+      Array.isArray(session?.groups) &&
+      session.groups.includes(REQUIRED_RANKER_GROUP)
   );
 }
 
