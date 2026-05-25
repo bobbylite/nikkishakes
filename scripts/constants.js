@@ -5,7 +5,8 @@ export const STORAGE_KEYS = Object.freeze({
   authSession: `${STORAGE_NAMESPACE}:auth-session`,
   oauthContext: `${STORAGE_NAMESPACE}:oauth-context`,
   authRedirectPending: `${STORAGE_NAMESPACE}:auth-redirect-pending`,
-  milkshakes: `${STORAGE_NAMESPACE}:milkshakes`
+  milkshakes: `${STORAGE_NAMESPACE}:milkshakes`,
+  forceLogin: `${STORAGE_NAMESPACE}:force-login`
 });
 
 export const ROUTES = Object.freeze({

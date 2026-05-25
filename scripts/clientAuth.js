@@ -94,6 +94,11 @@ export async function beginLogin() {
 
   scopes.forEach((scope) => provider.addScope(scope));
 
+  if (sessionStorage.getItem(STORAGE_KEYS.forceLogin)) {
+    provider.setCustomParameters({ prompt: "login" });
+    sessionStorage.removeItem(STORAGE_KEYS.forceLogin);
+  }
+
   const loginMode = resolveLoginMode(pingOneConfig.loginMode);
 
   if (loginMode === "redirect") {
@@ -150,6 +155,7 @@ function resolveLoginMode(value) {
 function buildSessionFromCredentialResult(result) {
   const credential = OAuthProvider.credentialFromResult(result);
   const accessToken = credential?.accessToken || "";
+  const idToken = credential?.idToken || "";
   const parsed = parseJwtPayload(accessToken);
   const groups = Array.isArray(parsed?.groups) ? parsed.groups : [];
   const expMs = Number(parsed?.exp || 0) > 0 ? Number(parsed.exp) * 1000 : 0;
@@ -160,6 +166,7 @@ function buildSessionFromCredentialResult(result) {
     groups,
     signedInAt: Date.now(),
     accessToken,
+    idToken,
     expiresAt: expMs
   };
 }
@@ -252,8 +259,13 @@ export async function handleAuthCallbackIfPresent() {
 }
 
 export function logout() {
+  const session = readSession();
+  const idToken = session?.idToken || "";
+
   clearSession();
   sessionStorage.removeItem(STORAGE_KEYS.authRedirectPending);
+  sessionStorage.setItem(STORAGE_KEYS.forceLogin, "1");
+
   if (window.firebaseAuth) {
     void signOut(window.firebaseAuth);
   }

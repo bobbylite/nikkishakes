@@ -21,5 +21,7 @@ export const pingOneConfig = {
 
   // Retained for local reference in docs only.
   issuerBaseUrl: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as",
+  signoffEndpoint: "https://auth.pingone.com/c74a4945-1364-4966-9a68-abeaa3e7b767/as/signoff",
+  postLogoutRedirectUri: originPath,
   redirectUri: originPath
 };
