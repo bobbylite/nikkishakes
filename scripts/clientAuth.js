@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from "./constants.js";
 import { pingOneConfig } from "./pingoneConfig.js";
+import { upsertUser } from "./users.js";
 import {
   OAuthProvider,
   getRedirectResult,
@@ -93,6 +94,8 @@ export async function beginLogin() {
     const session = buildSessionFromCredentialResult(popupResult);
     saveSession(session);
     sessionStorage.removeItem(STORAGE_KEYS.authRedirectPending);
+    const { pingOneUserId, email, displayName } = extractPingOneProfile(popupResult);
+    void upsertUser(popupResult.user, pingOneUserId, email, displayName);
     return {
       ok: true,
       authorized: session.groups.includes(REQUIRED_ADMIN_GROUP)
@@ -150,6 +153,17 @@ function buildSessionFromCredentialResult(result) {
   };
 }
 
+function extractPingOneProfile(result) {
+  const pingOneProviderData = result.user.providerData
+    .find(p => p.providerId === DEFAULT_PROVIDER_ID);
+
+  return {
+    pingOneUserId: pingOneProviderData?.uid || "",
+    email: result.user.email || pingOneProviderData?.email || "",
+    displayName: result.user.displayName || pingOneProviderData?.displayName || ""
+  };
+}
+
 export async function handleAuthCallbackIfPresent() {
   if (window.firebaseAuthReady) {
     await window.firebaseAuthReady;
@@ -172,6 +186,9 @@ export async function handleAuthCallbackIfPresent() {
 
       sessionStorage.removeItem(STORAGE_KEYS.authRedirectPending);
       cleanupCallbackQuery();
+
+      const { pingOneUserId, email, displayName } = extractPingOneProfile(result);
+      void upsertUser(result.user, pingOneUserId, email, displayName);
 
       return {
         handled: true,
