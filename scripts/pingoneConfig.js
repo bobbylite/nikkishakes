@@ -5,10 +5,14 @@ export const pingOneConfig = {
   enabled: true,
 
   // Login UX mode:
-  // - "auto": popup first, then redirect fallback
-  // - "popup": popup only
-  // - "redirect": redirect only
-  loginMode: "auto",
+  // - "redirect": PKCE redirect directly to PingOne (works on any domain)
+  // - "popup": Firebase popup (requires same-origin authDomain for reliable redirect)
+  // - "auto": popup first, PKCE redirect fallback if popup is blocked
+  loginMode: "redirect",
+
+  // Client ID of the PingOne Single Page Application configured for PKCE.
+  // The app's redirectUri below must be added as an allowed redirect URI in PingOne.
+  clientId: "f3525182-4238-4a46-91b2-6f3ef402787d",
 
   // Must match provider id configured in Firebase Auth (Authentication > Sign-in method > OpenID Connect).
   firebaseProviderId: "oidc.pingone",
